@@ -8,7 +8,7 @@ import threading
 try:
     import serial
 except ImportError:
-    serial = None    
+    serial = None
 
 
 class MultiVESC:
@@ -60,6 +60,8 @@ class VESC(object):
         msg = GetValues(can_id=self.can_id)
         self._get_values_msg = encode_request(msg)
         self._get_values_msg_expected_length = msg._full_msg_size
+        
+        self.measurements = None
 
     def __enter__(self):
         return self
@@ -107,16 +109,16 @@ class VESC(object):
                 import logging
                 # logging.getLogger().warning(f'WTF {num_read_bytes}')
 
-                response, consumed = decode(self.serial_port.read(num_read_bytes + 6))
+                # response, consumed = decode(self.serial_port.read(num_read_bytes + 6))
                 # logging.getLogger().warning(f'WTF {self.serial_port.in_waiting}')
                 # self.serial_port.read(self.serial_port.in_waiting)
 
                 # t0 = time.time()
-                # while self.serial_port.in_waiting <= num_read_bytes:
-                #     time.sleep(0.000001)  # add some delay just to help the CPU
+                while self.serial_port.in_waiting <= num_read_bytes:
+                    time.sleep(0.000001)  # add some delay just to help the CPU
                 # t1 = time.time()
                 # logging.getLogger().warning(f'UIUIU {t1 - t0} {self.serial_port.in_waiting}')
-                # response, consumed = decode(self.serial_port.read(self.serial_port.in_waiting))
+                response, consumed = decode(self.serial_port.read(self.serial_port.in_waiting))
                 return response
 
     def set_rpm(self, new_rpm):
@@ -149,6 +151,9 @@ class VESC(object):
         :return: A msg object with attributes containing the measurement values
         """
         return self.write(self._get_values_msg, num_read_bytes=self._get_values_msg_expected_length)
+    
+    def update_measurements(self):
+        self.measurements = self.get_measurements()
 
     def get_firmware_version(self):
         msg = GetVersion(can_id=self.can_id)
@@ -158,31 +163,41 @@ class VESC(object):
         """
         :return: Current motor rpm
         """
-        return self.get_measurements().rpm
+        if self.measurements is not None:
+            return self.measurements.rpm
+        return None
 
     def get_duty_cycle(self):
         """
         :return: Current applied duty-cycle
         """
-        return self.get_measurements().duty_now
+        if self.measurements is not None:
+            return self.measurements.duty_cycle_now
+        return None
 
     def get_v_in(self):
         """
         :return: Current input voltage
         """
-        return self.get_measurements().v_in
+        if self.measurements is not None:
+            return self.measurements.v_in
+        return None
 
     def get_motor_current(self):
         """
         :return: Current motor current
         """
-        return self.get_measurements().current_motor
+        if self.measurements is not None:
+            return self.measurements.avg_motor_current
+        return None
 
     def get_incoming_current(self):
         """
         :return: Current incoming current
         """
-        return self.get_measurements().current_in
+        if self.measurements is not None:
+            return self.measurements.avg_input_current
+        return None
 
 
 
